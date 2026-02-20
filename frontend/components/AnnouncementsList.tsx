@@ -19,7 +19,7 @@ export function AnnouncementsList() {
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        const response = await api.get('/announcements?limit=5');
+        const response = await api.get('/api/announcements?limit=5');
         setAnnouncements(response.data.announcements);
       } catch (error) {
         console.error('Failed to fetch announcements:', error);
