@@ -43,7 +43,7 @@ export function AnnouncementsList() {
     <div className="space-y-4">
       {announcements.map((announcement) => (
         <div key={announcement.id} className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-xl font-semibold mb-2">{announcement.title}</h3>
+          <h3 className="text-xl font-bold mb-2">{announcement.title}</h3>
           <p className="text-gray-600 mb-4 whitespace-pre-wrap">{announcement.content}</p>
           <div className="text-sm text-gray-500">
             Posted by {announcement.posted_by_name} on{' '}
