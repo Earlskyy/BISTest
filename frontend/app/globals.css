@@ -3,18 +3,18 @@
 @tailwind utilities;
 
 @keyframes marquee {
-  0% {
-    transform: translateX(100%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
 }
 
 .animate-marquee {
-  display: inline-block;
-  animation: marquee 20s linear infinite;
+  animation: marquee 10s linear infinite;
 }
+
+.delay-700 {
+  animation-delay: 700ms;
+}
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;

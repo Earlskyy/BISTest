@@ -17,6 +17,7 @@ export default function CertificateRequestPage() {
     contact_number: '',
     photo: null as File | null,
   });
+
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
@@ -30,7 +31,9 @@ export default function CertificateRequestPage() {
   const uploadImage = async (file: File): Promise<string> => {
     const fd = new FormData();
     fd.append('image', file);
-    const response = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    const response = await api.post('/upload', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data.url;
   };
 
@@ -77,34 +80,42 @@ export default function CertificateRequestPage() {
 
   if (referenceNumber) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white shadow rounded-lg p-8 text-center">
-            <div className="text-green-600 text-6xl mb-4">✓</div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Request Submitted Successfully</h1>
-            <p className="text-gray-600 mb-6">Save your reference number to check the status of your certificate.</p>
-            <div className="bg-gray-100 p-4 rounded-lg mb-4">
-              <p className="text-sm text-gray-600 mb-1">Your Reference Number</p>
-              <p className="text-xl font-mono font-bold text-gray-900">{referenceNumber}</p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4">
+        <div className="max-w-xl mx-auto">
+          <div className="bg-white shadow-xl border border-gray-100 rounded-2xl p-8 text-center">
+            <div className="text-green-600 text-5xl mb-4">✓</div>
+            <h1 className="text-2xl font-bold text-gray-900">Request Submitted</h1>
+            <p className="text-gray-500 mt-2 mb-6">
+              Save your reference number to track your certificate.
+            </p>
+
+            <div className="bg-gray-50 border rounded-xl p-4 mb-6">
+              <p className="text-xs text-gray-500 mb-1">REFERENCE NUMBER</p>
+              <p className="text-xl font-mono font-bold text-gray-900">
+                {referenceNumber}
+              </p>
             </div>
-            <div className="flex gap-4 justify-center">
+
+            <div className="flex gap-3 justify-center">
               <button
                 onClick={copyReference}
-                className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                className="px-5 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition shadow-sm"
               >
-                Copy Reference Number
+                Copy
               </button>
+
               <Link
                 href="/certificate-status"
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"
               >
                 Check Status
               </Link>
+
               <Link
                 href="/"
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"
               >
-                Back to Home
+                Home
               </Link>
             </div>
           </div>
@@ -114,146 +125,138 @@ export default function CertificateRequestPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4">
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white shadow rounded-lg p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Request Certificate</h1>
-          <p className="text-gray-600 mb-6">Fill in your personal information. You will receive a reference number to track your request.</p>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">Full Name *</label>
+        <div className="bg-white shadow-xl border border-gray-100 rounded-2xl p-8 space-y-8">
+
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+              Request Certificate
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">
+              Provide your details to request an official barangay certificate.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-8">
+
+            {/* PERSONAL INFO */}
+            <div className="space-y-4">
+              <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Personal Information
+              </h2>
+
               <input
-                type="text"
-                id="full_name"
+                placeholder="Full Name"
                 required
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition"
                 value={formData.full_name}
                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
               />
-            </div>
 
-            <div>
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700">Address *</label>
               <textarea
-                id="address"
+                placeholder="Address"
                 required
-                rows={3}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                rows={2}
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition resize-none"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               />
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="birth_date" className="block text-sm font-medium text-gray-700">Birth Date</label>
+              <div className="grid grid-cols-2 gap-4">
                 <input
                   type="date"
-                  id="birth_date"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm"
                   value={formData.birth_date}
                   onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
                 />
-              </div>
-              <div>
-                <label htmlFor="age" className="block text-sm font-medium text-gray-700">Age</label>
                 <input
                   type="number"
-                  id="age"
-                  min={1}
-                  max={120}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  placeholder="Age"
+                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm"
                   value={formData.age}
                   onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="civil_status" className="block text-sm font-medium text-gray-700">Civil Status</label>
+              <div className="grid grid-cols-2 gap-4">
                 <select
-                  id="civil_status"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm"
                   value={formData.civil_status}
                   onChange={(e) => setFormData({ ...formData, civil_status: e.target.value })}
                 >
-                  <option value="">Select</option>
-                  <option value="Single">Single</option>
-                  <option value="Married">Married</option>
-                  <option value="Widowed">Widowed</option>
-                  <option value="Separated">Separated</option>
-                  <option value="Divorced">Divorced</option>
+                  <option value="">Civil Status</option>
+                  <option>Single</option>
+                  <option>Married</option>
+                  <option>Widowed</option>
+                  <option>Separated</option>
+                  <option>Divorced</option>
                 </select>
-              </div>
-              <div>
-                <label htmlFor="contact_number" className="block text-sm font-medium text-gray-700">Contact Number</label>
+
                 <input
                   type="tel"
-                  id="contact_number"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  placeholder="Contact Number"
+                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm"
                   value={formData.contact_number}
                   onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
                 />
               </div>
             </div>
 
-            <div>
-              <label htmlFor="certificate_type" className="block text-sm font-medium text-gray-700">Certificate Type *</label>
+            {/* CERTIFICATE DETAILS */}
+            <div className="space-y-4 pt-4 border-t">
+              <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                Certificate Details
+              </h2>
+
               <select
-                id="certificate_type"
                 required
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm"
                 value={formData.certificate_type}
                 onChange={(e) => setFormData({ ...formData, certificate_type: e.target.value })}
               >
-                <option value="">Select certificate type</option>
-                <option value="Barangay Clearance">Barangay Clearance</option>
-                <option value="Certificate of Residency">Certificate of Residency</option>
-                <option value="Certificate of Indigency">Certificate of Indigency</option>
-                <option value="Certificate of Good Moral Character">Certificate of Good Moral Character</option>
+                <option value="">Certificate Type</option>
+                <option>Barangay Clearance</option>
+                <option>Certificate of Residency</option>
+                <option>Certificate of Indigency</option>
+                <option>Certificate of Good Moral Character</option>
               </select>
-            </div>
 
-            <div>
-              <label htmlFor="purpose" className="block text-sm font-medium text-gray-700">Purpose</label>
               <textarea
-                id="purpose"
+                placeholder="Purpose"
                 rows={2}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
-                placeholder="e.g., Employment, Business Permit, Scholarship"
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm resize-none"
                 value={formData.purpose}
                 onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
               />
-            </div>
 
-            <div>
-              <label htmlFor="photo" className="block text-sm font-medium text-gray-700">Photo (Optional)</label>
               <input
                 type="file"
-                id="photo"
                 accept="image/*"
-                className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700"
+                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-100 file:text-primary-700 hover:file:bg-primary-200 transition"
                 onChange={handleFileChange}
               />
             </div>
 
+            {/* ACTIONS */}
             <div className="flex gap-4">
               <button
                 type="submit"
                 disabled={loading || uploading}
-                className="flex-1 bg-primary-600 text-white py-2 px-4 rounded-md hover:bg-primary-700 disabled:opacity-50"
+                className="flex-1 bg-primary-600 text-white py-2.5 rounded-xl hover:bg-primary-700 transition shadow-sm"
               >
                 {uploading ? 'Uploading...' : loading ? 'Submitting...' : 'Submit Request'}
               </button>
+
               <Link
                 href="/"
-                className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 text-center"
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl hover:bg-gray-200 transition text-center"
               >
                 Cancel
               </Link>
             </div>
+
           </form>
         </div>
       </div>
