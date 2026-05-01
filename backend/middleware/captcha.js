@@ -4,21 +4,29 @@ const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
 const RECAPTCHA_SECRET_KEY = process.env.GOOGLE_RECAPTCHA_SECRET_KEY;
 
 /**
- * Middleware to verify Google reCAPTCHA v3 token
- * Checks if token is valid and score is above threshold
+ * Middleware to verify Google reCAPTCHA v2 or v3 token
+ * For v2: Checks if checkbox was completed
+ * For v3: Checks if token is valid and score is above threshold
  */
 export async function verifyCaptcha(req, res, next) {
   try {
     const isProduction = process.env.NODE_ENV === 'production';
-    const { recaptcha_token } = req.body;
+    const { recaptcha_token, recaptcha_verified } = req.body;
 
+    // If recaptcha_verified flag is true, it means v2 checkbox was completed on client
+    if (recaptcha_verified === true) {
+      req.captcha = { verified: true };
+      return next();
+    }
+
+    // Otherwise, proceed with token verification (v3 or v2 with token)
     if (!recaptcha_token) {
       if (!isProduction) {
         console.warn('reCAPTCHA token missing in non-production. Skipping verification.');
         req.captcha = { verified: false, skipped: true, reason: 'missing_token_non_production' };
         return next();
       }
-      return res.status(400).json({ error: 'reCAPTCHA token is required' });
+      return res.status(400).json({ error: 'reCAPTCHA verification required' });
     }
 
     if (!RECAPTCHA_SECRET_KEY) {
@@ -40,11 +48,6 @@ export async function verifyCaptcha(req, res, next) {
 
     const { success, score, action, challenge_ts, hostname, error_codes } = response.data;
 
-    // reCAPTCHA v3 returns a score (0.0 to 1.0)
-    // Higher score = more likely to be legitimate
-    // We'll use a threshold of 0.5 to allow most legitimate traffic
-    const SCORE_THRESHOLD = 0.5;
-
     if (!success) {
       console.warn('reCAPTCHA verification failed:', error_codes);
       if (!isProduction) {
@@ -57,20 +60,24 @@ export async function verifyCaptcha(req, res, next) {
       });
     }
 
-    if (score < SCORE_THRESHOLD) {
-      console.warn(`reCAPTCHA score too low: ${score} (threshold: ${SCORE_THRESHOLD})`);
-      if (!isProduction) {
-        req.captcha = {
-          verified: false,
-          skipped: true,
-          reason: 'low_score_non_production',
-          score,
-        };
-        return next();
+    // For v3, check score threshold
+    if (score !== undefined) {
+      const SCORE_THRESHOLD = 0.5;
+      if (score < SCORE_THRESHOLD) {
+        console.warn(`reCAPTCHA score too low: ${score} (threshold: ${SCORE_THRESHOLD})`);
+        if (!isProduction) {
+          req.captcha = {
+            verified: false,
+            skipped: true,
+            reason: 'low_score_non_production',
+            score,
+          };
+          return next();
+        }
+        return res.status(400).json({
+          error: 'reCAPTCHA validation failed. Your request appears automated. Please try again.',
+        });
       }
-      return res.status(400).json({
-        error: 'reCAPTCHA validation failed. Your request appears automated. Please try again.',
-      });
     }
 
     // Attach verification details to request for logging if needed

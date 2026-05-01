@@ -9,6 +9,7 @@ interface Announcement {
   id: string;
   title: string;
   content: string;
+  image_url?: string | null;
   posted_by_name: string;
   created_at: string;
 }
@@ -76,6 +77,9 @@ export default function AnnouncementsPage() {
               </div>
             </div>
             <p className="text-gray-600 mb-4 whitespace-pre-wrap">{announcement.content}</p>
+            {announcement.image_url && (
+              <img src={announcement.image_url} alt={announcement.title} className="mb-4 w-full max-h-80 rounded-lg object-cover" />
+            )}
             <div className="text-sm text-gray-500">
               Posted by {announcement.posted_by_name} on{' '}
               {new Date(announcement.created_at).toLocaleDateString()}

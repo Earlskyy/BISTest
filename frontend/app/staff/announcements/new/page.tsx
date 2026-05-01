@@ -11,14 +11,30 @@ export default function NewAnnouncementPage() {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
+    image_url: '',
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const fd = new FormData();
+    fd.append('image', file);
+    const res = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return res.data.url;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post('/announcements', formData);
+      let imageUrl = formData.image_url || '';
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      }
+      await api.post('/announcements', {
+        ...formData,
+        image_url: imageUrl || undefined,
+      });
       toast.success('Announcement posted successfully');
       router.push('/staff/announcements');
     } catch (error: any) {
@@ -59,6 +75,27 @@ export default function NewAnnouncementPage() {
               onChange={(e) => setFormData({ ...formData, content: e.target.value })}
               placeholder="Enter announcement content..."
             />
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Image URL (optional)</label>
+              <input
+                type="url"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                value={formData.image_url}
+                onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                placeholder="https://..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Upload Image (optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              />
+            </div>
           </div>
           <div className="flex gap-4">
             <button

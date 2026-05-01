@@ -64,11 +64,11 @@ router.use(authorize('staff', 'admin'));
 // Create announcement
 router.post('/', validate(schemas.createAnnouncement), async (req, res, next) => {
   try {
-    const { title, content } = req.body;
+    const { title, content, image_url } = req.body;
 
     const result = await pool.query(
-      'INSERT INTO announcements (title, content, posted_by) VALUES ($1, $2, $3) RETURNING *',
-      [title, content, req.user.id]
+      'INSERT INTO announcements (title, content, image_url, posted_by) VALUES ($1, $2, $3, $4) RETURNING *',
+      [title, content, image_url || null, req.user.id]
     );
 
     res.status(201).json(result.rows[0]);
@@ -80,7 +80,7 @@ router.post('/', validate(schemas.createAnnouncement), async (req, res, next) =>
 // Update announcement
 router.put('/:id', async (req, res, next) => {
   try {
-    const { title, content } = req.body;
+    const { title, content, image_url } = req.body;
 
     const updates = [];
     const params = [];
@@ -94,6 +94,11 @@ router.put('/:id', async (req, res, next) => {
     if (content) {
       updates.push(`content = $${paramCount++}`);
       params.push(content);
+    }
+
+    if (image_url !== undefined) {
+      updates.push(`image_url = $${paramCount++}`);
+      params.push(image_url || null);
     }
 
     if (updates.length === 0) {

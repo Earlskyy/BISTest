@@ -250,6 +250,21 @@ async function runMigration() {
       console.log('✓ Added package_item_name column');
     }
 
+    // 8.5 Update announcements for media support
+    console.log('Updating announcements table...');
+    const announcementDescribe = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name='announcements'
+    `);
+    const announcementColumns = announcementDescribe.rows.map(r => r.column_name);
+    if (!announcementColumns.includes('image_url')) {
+      await client.query(`
+        ALTER TABLE announcements
+        ADD COLUMN image_url TEXT
+      `);
+      console.log('✓ Added image_url column');
+    }
+
     // 9. Create indexes for email_notifications
     console.log('Creating indexes...');
     await client.query(`

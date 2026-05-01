@@ -9,9 +9,10 @@ import { toast } from 'react-toastify';
 export default function EditAnnouncementPage() {
   const params = useParams();
   const router = useRouter();
-  const [formData, setFormData] = useState({ title: '', content: '' });
+  const [formData, setFormData] = useState({ title: '', content: '', image_url: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchAnnouncement();
@@ -20,7 +21,7 @@ export default function EditAnnouncementPage() {
   const fetchAnnouncement = async () => {
     try {
       const res = await api.get(`/announcements/${params.id}`);
-      setFormData({ title: res.data.title, content: res.data.content });
+      setFormData({ title: res.data.title, content: res.data.content, image_url: res.data.image_url || '' });
     } catch (error) {
       toast.error('Failed to load announcement');
       router.push('/staff/announcements');
@@ -33,7 +34,14 @@ export default function EditAnnouncementPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.put(`/announcements/${params.id}`, formData);
+      let imageUrl = formData.image_url || '';
+      if (imageFile) {
+        const fd = new FormData();
+        fd.append('image', imageFile);
+        const uploadRes = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        imageUrl = uploadRes.data.url;
+      }
+      await api.put(`/announcements/${params.id}`, { ...formData, image_url: imageUrl || null });
       toast.success('Announcement updated');
       router.push('/staff/announcements');
     } catch (error: any) {
@@ -74,6 +82,26 @@ export default function EditAnnouncementPage() {
               value={formData.content}
               onChange={(e) => setFormData({ ...formData, content: e.target.value })}
             />
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Image URL (optional)</label>
+              <input
+                type="url"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                value={formData.image_url}
+                onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Upload New Image (optional)</label>
+              <input
+                type="file"
+                accept="image/*"
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              />
+            </div>
           </div>
           <div className="flex gap-4">
             <button

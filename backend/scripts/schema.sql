@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS announcements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
+    image_url TEXT,
     posted_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
