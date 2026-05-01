@@ -6,7 +6,17 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes
-  const publicRoutes = ['/', '/login', '/certificate-request', '/file-complaint', '/certificate-status'];
+  const publicRoutes = [
+    '/',
+    '/login',
+    '/certificate-request',
+    '/file-complaint',
+    '/certificate-status',
+    '/track-status',
+    '/track-document',
+    '/track-complaint',
+    '/track-report',
+  ];
   const isPublicRoute = publicRoutes.includes(pathname) || pathname.startsWith('/api');
 
   // Protected routes

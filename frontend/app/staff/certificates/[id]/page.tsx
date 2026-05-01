@@ -22,6 +22,13 @@ interface CertificateRequest {
   profile_photo_url: string | null;
   template_id: string | null;
   status: string;
+  rejection_reason?: string | null;
+  flagged_reason?: string | null;
+  package_name?: string | null;
+  package_item_name?: string | null;
+  purok_cert_url?: string | null;
+  sanitary_card_url?: string | null;
+  created_at?: string;
 }
 
 interface CertificateTemplate {
@@ -31,6 +38,8 @@ interface CertificateTemplate {
   html_template: string;
   logo_url: string | null;
   include_profile_photo: boolean;
+  paper_size?: 'A4' | 'LEGAL';
+  orientation?: 'portrait' | 'landscape';
 }
 
 export default function CertificateTemplatePage() {
@@ -44,8 +53,13 @@ export default function CertificateTemplatePage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [reasonMode, setReasonMode] = useState<'reject' | 'flag' | null>(null);
+  const [predefinedReasons, setPredefinedReasons] = useState<Array<{ id: string; label: string }>>([]);
+  const [reasonPredefined, setReasonPredefined] = useState('');
+  const [reasonCustom, setReasonCustom] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const isApprovedFlow = request?.status === 'approved' || request?.status === 'released';
 
   useEffect(() => {
     return () => {
@@ -78,6 +92,8 @@ export default function CertificateTemplatePage() {
       const existingTemplateId = res.data.template_id;
       const fallback = (tRes.data.templates?.[0]?.id as string) || '';
       setSelectedTemplateId(existingTemplateId || fallback);
+      const reasonRes = await api.get('/certificates/predefined-reasons');
+      setPredefinedReasons(reasonRes.data.reasons || []);
     } catch (error) {
       toast.error('Failed to load certificate');
       router.push('/staff/certificates');
@@ -102,6 +118,8 @@ export default function CertificateTemplatePage() {
       civil_status: formData.civil_status || request.civil_status || '',
       purpose: formData.purpose || request.purpose || '',
       profile_photo_url: request.profile_photo_url || '',
+      name: formData.full_name || request.full_name || '',
+      date: new Date().toLocaleDateString(),
     };
     let html = selectedTemplate.html_template || '';
     for (const [k, v] of Object.entries(map)) {
@@ -109,6 +127,10 @@ export default function CertificateTemplatePage() {
     }
     return html;
   }, [request, selectedTemplate, formData]);
+
+  const printSize = selectedTemplate?.paper_size === 'LEGAL' ? '8.5in 13in' : 'A4';
+  const pdfFormat = selectedTemplate?.paper_size === 'LEGAL' ? [216, 330] : 'a4';
+  const pdfOrientation = selectedTemplate?.orientation === 'landscape' ? 'landscape' : 'portrait';
 
   const uploadImage = async (file: File): Promise<string> => {
     const fd = new FormData();
@@ -198,7 +220,7 @@ export default function CertificateTemplatePage() {
 
   const handleApprove = async () => {
     try {
-      await api.put(`/certificates/${request!.id}/status`, { status: 'approved' });
+      await api.put(`/certificates/${request!.id}/approve`);
       toast.success('Certificate approved');
       fetchRequest();
     } catch (error: any) {
@@ -208,7 +230,7 @@ export default function CertificateTemplatePage() {
 
   const handleRelease = async () => {
     try {
-      await api.put(`/certificates/${request!.id}/status`, { status: 'released' });
+      await api.put(`/certificates/${request!.id}/release`);
       toast.success('Certificate released');
       fetchRequest();
     } catch (error: any) {
@@ -216,8 +238,29 @@ export default function CertificateTemplatePage() {
     }
   };
 
+  const submitReasonAction = async () => {
+    if (!request || !reasonMode) return;
+    if (!reasonPredefined && !reasonCustom.trim()) {
+      toast.error('Please select a predefined reason or provide a custom reason');
+      return;
+    }
+    try {
+      await api.put(`/certificates/${request.id}/${reasonMode}`, {
+        reason_predefined: reasonPredefined || undefined,
+        reason_custom: reasonCustom.trim() || undefined
+      });
+      toast.success(`Certificate ${reasonMode === 'reject' ? 'rejected' : 'flagged'} successfully`);
+      setReasonMode(null);
+      setReasonPredefined('');
+      setReasonCustom('');
+      fetchRequest();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to update certificate status');
+    }
+  };
+
   const downloadPDF = () => {
-    const doc = new jsPDF('p', 'mm', 'a4');
+    const doc = new jsPDF(pdfOrientation === 'landscape' ? 'l' : 'p', 'mm', pdfFormat as any);
     const pageWidth = doc.internal.pageSize.getWidth();
 
     doc.setFontSize(18);
@@ -267,35 +310,65 @@ export default function CertificateTemplatePage() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6 no-print">
+    <div className="space-y-6">
+      <style>{`@media print { @page { size: ${printSize}; margin: 10mm; } }`}</style>
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm no-print sm:flex-row sm:items-center sm:justify-between">
         <Link href="/staff/certificates" className="text-primary-600 hover:text-primary-700">← Back to Certificates</Link>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={handleSave} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">
             Save Changes
           </button>
-          <button onClick={downloadPDF} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            Download PDF
-          </button>
-          <button onClick={handlePrint} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 print:hidden">
-            Print
-          </button>
+          {isApprovedFlow && (
+            <>
+              <button onClick={downloadPDF} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Download PDF
+              </button>
+              <button onClick={handlePrint} className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 print:hidden">
+                Print
+              </button>
+            </>
+          )}
           {request.status === 'pending' && (
             <>
               <button onClick={handleApprove} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
                 Approve
               </button>
-              <button onClick={handleRelease} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
-                Approve & Release
+              <button
+                onClick={() => setReasonMode('flag')}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+              >
+                Flag
+              </button>
+              <button
+                onClick={() => setReasonMode('reject')}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Reject
               </button>
             </>
+          )}
+          {request.status === 'approved' && (
+            <button onClick={handleRelease} className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700">
+              Release Document
+            </button>
           )}
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow no-print">
-          <h3 className="text-lg font-semibold mb-4">Edit Certificate Information</h3>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm no-print">
+          <h3 className="mb-4 text-lg font-semibold text-slate-900">Request Review</h3>
+          <div className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm">
+            <p><span className="font-semibold">Reference:</span> {request.reference_number}</p>
+            <p><span className="font-semibold">Status:</span> {request.status}</p>
+            <p><span className="font-semibold">Submitted:</span> {new Date(request.created_at || Date.now()).toLocaleString()}</p>
+          </div>
+          {(request.package_name || request.package_item_name) && (
+            <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+              Package: <strong>{request.package_name || 'Custom package'}</strong>
+              {request.package_item_name ? ` • Document: ${request.package_item_name}` : ''}
+            </div>
+          )}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex-1 min-w-[240px]">
@@ -322,6 +395,12 @@ export default function CertificateTemplatePage() {
                 Use Template
               </button>
             </div>
+            {selectedTemplate && (
+              <p className="mt-3 text-xs text-gray-600">
+                Paper: <strong>{selectedTemplate.paper_size || 'A4'}</strong> • Orientation:{' '}
+                <strong>{selectedTemplate.orientation || 'portrait'}</strong>
+              </p>
+            )}
 
             {selectedTemplate?.include_profile_photo && (
               <div className="mt-4">
@@ -372,35 +451,29 @@ export default function CertificateTemplatePage() {
                   </div>
                 </div>
 
-                {cameraOpen && (
-                  <div className="mt-4 p-4 border rounded-lg bg-white">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold">Camera Capture</h4>
-                      <button type="button" onClick={closeCamera} className="text-sm text-red-600">
-                        Close
-                      </button>
-                    </div>
-                    <video ref={videoRef} className="w-full rounded border" playsInline />
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={capturePhoto}
-                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                      >
-                        Capture & Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={closeCamera}
-                        className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
+          </div>
+          <div className="mb-6 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm">
+            <h4 className="font-semibold text-slate-800">Requirements</h4>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="rounded-lg border p-2">
+                <p className="mb-1 text-xs font-semibold text-slate-600">Purok Certification</p>
+                {request.purok_cert_url ? (
+                  <img src={request.purok_cert_url} alt="Purok Certification" className="h-40 w-full rounded object-cover" />
+                ) : (
+                  <p className="text-xs text-slate-500">No uploaded file.</p>
+                )}
+              </div>
+              <div className="rounded-lg border p-2">
+                <p className="mb-1 text-xs font-semibold text-slate-600">Sanitary Card</p>
+                {request.sanitary_card_url ? (
+                  <img src={request.sanitary_card_url} alt="Sanitary Card" className="h-40 w-full rounded object-cover" />
+                ) : (
+                  <p className="text-xs text-slate-500">No uploaded file.</p>
+                )}
+              </div>
+            </div>
           </div>
           <div className="space-y-4">
             <div>
@@ -465,10 +538,18 @@ export default function CertificateTemplatePage() {
         <div
           ref={templateRef}
           className="bg-white p-8 rounded-lg shadow border-2 print:border-0"
-          style={{ minHeight: '297mm' }}
+          style={{
+            minHeight: selectedTemplate?.paper_size === 'LEGAL' ? '330mm' : '297mm',
+            maxWidth: selectedTemplate?.paper_size === 'LEGAL' ? '216mm' : '210mm',
+            margin: '0 auto'
+          }}
         >
-          {selectedTemplate ? (
+          {isApprovedFlow && selectedTemplate ? (
             <div dangerouslySetInnerHTML={{ __html: renderedTemplateHtml }} />
+          ) : request.status === 'pending' ? (
+            <div className="text-gray-600">
+              Review and decide first. Certificate rendering is unlocked only after approval.
+            </div>
           ) : (
             <div className="text-gray-600">
               No template selected for this certificate type. Create one in{' '}
@@ -480,6 +561,94 @@ export default function CertificateTemplatePage() {
           )}
         </div>
       </div>
+
+      {reasonMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-xl rounded-lg bg-white p-6">
+            <h3 className="text-lg font-semibold mb-4">
+              {reasonMode === 'reject' ? 'Reject Request' : 'Flag Request'}
+            </h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Select a predefined reason and/or add a custom explanation.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Predefined Reason</label>
+                <select
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  value={reasonPredefined}
+                  onChange={(e) => setReasonPredefined(e.target.value)}
+                >
+                  <option value="">Select reason</option>
+                  {predefinedReasons.map((reason) => (
+                    <option key={reason.id} value={reason.label}>
+                      {reason.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Custom Reason</label>
+                <textarea
+                  rows={4}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                  placeholder="Add detailed reason if needed..."
+                  value={reasonCustom}
+                  onChange={(e) => setReasonCustom(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setReasonMode(null);
+                  setReasonPredefined('');
+                  setReasonCustom('');
+                }}
+                className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitReasonAction}
+                className={`px-4 py-2 rounded-md text-white ${reasonMode === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-orange-500 hover:bg-orange-600'}`}
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cameraOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white p-5 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="font-semibold">Camera Capture</h4>
+              <button type="button" onClick={closeCamera} className="text-sm text-red-600">
+                Close
+              </button>
+            </div>
+            <video ref={videoRef} className="w-full rounded border" playsInline />
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={capturePhoto}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+              >
+                Capture & Save
+              </button>
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

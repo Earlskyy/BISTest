@@ -31,7 +31,18 @@ export default function WalkInCertificatePage() {
     contact_number: '',
     template_id: '',
     profile_photo_url: '',
+    package_code: '',
   });
+
+  const packageOptions = [
+    { code: '', label: 'Single document request', documents: [] as string[] },
+    {
+      code: 'first_time_job_seeker',
+      label: 'First Time Job Seeker Package',
+      documents: ['Barangay Clearance', 'Certificate of Indigency', 'Affidavit', 'Checklist Form'],
+    },
+  ];
+  const selectedPackage = packageOptions.find((pkg) => pkg.code === formData.package_code);
 
   const [profilePhotoUploading, setProfilePhotoUploading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -141,10 +152,16 @@ export default function WalkInCertificatePage() {
         contact_number: formData.contact_number || undefined,
         template_id: formData.template_id || undefined,
         profile_photo_url: formData.profile_photo_url || undefined,
+        package_code: formData.package_code || undefined,
       });
 
       toast.success(`Walk-in created. Ref: ${res.data.reference_number}`);
-      router.push(`/staff/certificates/${res.data.id}`);
+      const firstRequestId = res.data.id || res.data.requests?.[0]?.id;
+      if (firstRequestId) {
+        router.push(`/staff/certificates/${firstRequestId}`);
+      } else {
+        router.push('/staff/certificates');
+      }
     } catch (e: any) {
       toast.error(e.response?.data?.error || 'Failed to create walk-in certificate');
     } finally {
@@ -200,6 +217,20 @@ export default function WalkInCertificatePage() {
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-medium text-gray-700">Request Type</label>
+              <select
+                className="mt-1 w-full border rounded-md px-3 py-2"
+                value={formData.package_code}
+                onChange={(e) => setFormData((p) => ({ ...p, package_code: e.target.value }))}
+              >
+                {packageOptions.map((option) => (
+                  <option key={option.code || 'single'} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700">Certificate Type *</label>
               <input
                 required
@@ -210,6 +241,7 @@ export default function WalkInCertificatePage() {
                   setFormData((p) => ({ ...p, certificate_type: v }));
                   await loadTemplates(v);
                 }}
+                disabled={!!formData.package_code}
               />
             </div>
             <div>
@@ -229,6 +261,16 @@ export default function WalkInCertificatePage() {
               </select>
             </div>
           </div>
+          {selectedPackage && selectedPackage.documents.length > 0 && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+              <p className="font-medium">Package includes:</p>
+              <ul className="mt-2 list-disc pl-5">
+                {selectedPackage.documents.map((doc) => (
+                  <li key={doc}>{doc}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="grid md:grid-cols-3 gap-4">
             <div>

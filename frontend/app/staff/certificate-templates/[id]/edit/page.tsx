@@ -29,6 +29,10 @@ export default function EditCertificateTemplatePage() {
   const [certificateType, setCertificateType] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
   const [includeProfilePhoto, setIncludeProfilePhoto] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [isDefault, setIsDefault] = useState(false);
+  const [paperSize, setPaperSize] = useState<'A4' | 'LEGAL'>('A4');
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [htmlTemplate, setHtmlTemplate] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const insertTokenRef = useRef<(t: string) => void>(() => {});
@@ -41,6 +45,10 @@ export default function EditCertificateTemplatePage() {
         setCertificateType(res.data.certificate_type);
         setLogoUrl(res.data.logo_url || '');
         setIncludeProfilePhoto(!!res.data.include_profile_photo);
+        setIsActive(res.data.is_active !== false);
+        setIsDefault(!!res.data.is_default);
+        setPaperSize((res.data.paper_size || 'A4') as 'A4' | 'LEGAL');
+        setOrientation((res.data.orientation || 'portrait') as 'portrait' | 'landscape');
         setHtmlTemplate(res.data.html_template);
       } catch {
         toast.error('Failed to load template');
@@ -102,6 +110,10 @@ export default function EditCertificateTemplatePage() {
         html_template: htmlTemplate,
         logo_url: finalLogoUrl || null,
         include_profile_photo: includeProfilePhoto,
+        is_active: isActive,
+        is_default: isDefault,
+        paper_size: paperSize,
+        orientation,
       });
       toast.success('Template updated');
       router.push('/staff/certificate-templates');
@@ -146,10 +158,42 @@ export default function EditCertificateTemplatePage() {
               <input type="file" accept="image/*" className="mt-1 w-full" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
             </div>
           </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Paper Size</label>
+              <select
+                className="mt-1 w-full border rounded-md px-3 py-2"
+                value={paperSize}
+                onChange={(e) => setPaperSize(e.target.value as 'A4' | 'LEGAL')}
+              >
+                <option value="A4">A4</option>
+                <option value="LEGAL">LEGAL (8.5 x 13 in)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Orientation</label>
+              <select
+                className="mt-1 w-full border rounded-md px-3 py-2"
+                value={orientation}
+                onChange={(e) => setOrientation(e.target.value as 'portrait' | 'landscape')}
+              >
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </div>
+          </div>
 
           <label className="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" checked={includeProfilePhoto} onChange={(e) => setIncludeProfilePhoto(e.target.checked)} />
             Include Profile Photo placeholder in certificate workflow
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm ml-4">
+            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+            Active template
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm ml-4">
+            <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />
+            Set as default for this type
           </label>
 
           <div>

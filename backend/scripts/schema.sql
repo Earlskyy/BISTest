@@ -83,6 +83,10 @@ CREATE TABLE IF NOT EXISTS certificate_templates (
     html_template TEXT NOT NULL,
     logo_url TEXT,
     include_profile_photo BOOLEAN NOT NULL DEFAULT FALSE,
+    paper_size VARCHAR(20) NOT NULL DEFAULT 'A4' CHECK (paper_size IN ('A4', 'LEGAL')),
+    orientation VARCHAR(20) NOT NULL DEFAULT 'portrait' CHECK (orientation IN ('portrait', 'landscape')),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

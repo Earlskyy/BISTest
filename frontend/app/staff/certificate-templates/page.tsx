@@ -10,6 +10,10 @@ interface Template {
   name: string;
   certificate_type: string;
   include_profile_photo: boolean;
+  is_active: boolean;
+  is_default: boolean;
+  paper_size: 'A4' | 'LEGAL';
+  orientation: 'portrait' | 'landscape';
   created_at: string;
 }
 
@@ -19,7 +23,7 @@ export default function CertificateTemplatesPage() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await api.get('/certificate-templates');
+      const res = await api.get('/certificate-templates?include_inactive=true');
       setTemplates(res.data.templates);
     } catch {
       toast.error('Failed to fetch templates');
@@ -64,6 +68,8 @@ export default function CertificateTemplatesPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Certificate Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profile Photo</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Print</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
             </tr>
           </thead>
@@ -73,6 +79,10 @@ export default function CertificateTemplatesPage() {
                 <td className="px-6 py-4">{t.name}</td>
                 <td className="px-6 py-4">{t.certificate_type}</td>
                 <td className="px-6 py-4">{t.include_profile_photo ? 'Enabled' : 'Disabled'}</td>
+                <td className="px-6 py-4">{t.paper_size} • {t.orientation}</td>
+                <td className="px-6 py-4">
+                  {t.is_active ? 'Active' : 'Disabled'}{t.is_default ? ' • Default' : ''}
+                </td>
                 <td className="px-6 py-4 text-sm">
                   <div className="flex gap-3">
                     <Link
@@ -93,7 +103,7 @@ export default function CertificateTemplatesPage() {
             ))}
             {templates.length === 0 && (
               <tr>
-                <td className="px-6 py-8 text-center text-gray-500" colSpan={4}>
+                <td className="px-6 py-8 text-center text-gray-500" colSpan={6}>
                   No templates yet.
                 </td>
               </tr>

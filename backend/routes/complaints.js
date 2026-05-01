@@ -2,20 +2,64 @@ import express from 'express';
 import pool from '../config/database.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
+import { verifyCaptcha } from '../middleware/captcha.js';
+import { sendSubmissionEmail, sendStatusUpdateEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
+function generateTrackingNumber() {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const random = Math.random().toString(36).substr(2, 6).toUpperCase();
+  return `BIS-${date}-${random}`;
+}
+
 // Public route: Create complaint (no auth required)
-router.post('/', validate(schemas.createComplaint), async (req, res, next) => {
+router.post('/', verifyCaptcha, validate(schemas.createComplaint), async (req, res, next) => {
   try {
-    const { reporter_name, reporter_photo_url, incident_photo_url, reported_person, complaint_details } = req.body;
+    const { reporter_name, reporter_email, reporter_photo_url, incident_photo_url, reported_person, complaint_details } = req.body;
+
+    const tracking_number = generateTrackingNumber();
 
     const result = await pool.query(
-      'INSERT INTO complaints (reporter_name, reporter_photo_url, incident_photo_url, reported_person, complaint_details) VALUES ($1, $2, $3, $4, $5) RETURNING id, status, created_at',
-      [reporter_name, reporter_photo_url, incident_photo_url, reported_person, complaint_details]
+      `INSERT INTO complaints 
+       (tracking_number, reporter_name, reporter_email, reporter_photo_url, incident_photo_url, reported_person, complaint_details, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'submitted') 
+       RETURNING id, tracking_number, status, created_at`,
+      [tracking_number, reporter_name, reporter_email, reporter_photo_url, incident_photo_url, reported_person, complaint_details]
+    );
+
+    // Send submission email
+    await sendSubmissionEmail(reporter_email, tracking_number, 'complaint', {
+      reporter_name,
+    });
+
+    // Mark email as sent
+    await pool.query(
+      'UPDATE complaints SET email_sent = true WHERE id = $1',
+      [result.rows[0].id]
     );
 
     res.status(201).json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Public route: Track complaint by tracking number
+router.get('/track/:trackingNumber', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, tracking_number, reporter_name, status, reason_for_update, created_at, updated_at 
+       FROM complaints 
+       WHERE UPPER(tracking_number) = UPPER($1)`,
+      [req.params.trackingNumber.trim()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Complaint not found. Please check your tracking number.' });
+    }
+
+    res.json(result.rows[0]);
   } catch (error) {
     next(error);
   }
@@ -108,22 +152,48 @@ router.get('/:id', async (req, res, next) => {
 // Update complaint status
 router.put('/:id/status', async (req, res, next) => {
   try {
-    const { status } = req.body;
+    const { status, reason_for_update } = req.body;
 
-    if (!['pending', 'validated', 'resolved', 'archived'].includes(status)) {
+    if (!['submitted', 'under_review', 'resolved', 'closed'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
+    // For resolved and closed, reason is needed
+    if ((status === 'resolved' || status === 'closed') && !reason_for_update) {
+      return res.status(400).json({ error: 'Reason is required when resolving or closing complaint' });
+    }
+
     const result = await pool.query(
-      'UPDATE complaints SET status = $1, reviewed_by = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
-      [status, req.user.id, req.params.id]
+      `UPDATE complaints 
+       SET status = $1, reviewed_by = $2, reason_for_update = $3, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $4 RETURNING *`,
+      [status, req.user.id, reason_for_update || null, req.params.id]
     );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Complaint not found' });
     }
 
-    res.json(result.rows[0]);
+    const complaint = result.rows[0];
+
+    // Send status update email
+    if (complaint.reporter_email) {
+      await sendStatusUpdateEmail(
+        complaint.reporter_email,
+        complaint.tracking_number,
+        status,
+        reason_for_update || '',
+        'complaint',
+        { reporter_name: complaint.reporter_name }
+      );
+
+      await pool.query(
+        'UPDATE complaints SET email_sent = true WHERE id = $1',
+        [complaint.id]
+      );
+    }
+
+    res.json(complaint);
   } catch (error) {
     next(error);
   }

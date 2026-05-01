@@ -77,7 +77,32 @@ export const schemas = {
       civil_status: z.string().optional(),
       purpose: z.string().optional(),
       contact_number: z.string().optional(),
-      photo_url: z.string().optional()
+      photo_url: z.string().optional(),
+      purok_cert_url: z.string().url('Purok certification must be a valid URL'),
+      sanitary_card_url: z.string().url('Sanitary card must be a valid URL'),
+      recaptcha_token: z.string().min(1, 'reCAPTCHA token is required'),
+      reporter_email: z.string().email('Valid email is required').optional(),
+      package_code: z.string().optional()
+    })
+  }),
+
+  createWalkInCertificateRequest: z.object({
+    body: z.object({
+      full_name: z.string().min(2).max(255),
+      address: z.string().min(5),
+      certificate_type: z.string().min(2),
+      birth_date: z.string().optional(),
+      age: z.union([z.number(), z.string()]).optional(),
+      civil_status: z.string().optional(),
+      purpose: z.string().optional(),
+      contact_number: z.string().optional(),
+      photo_url: z.string().optional(),
+      profile_photo_url: z.string().optional(),
+      purok_cert_url: z.string().url().optional(),
+      sanitary_card_url: z.string().url().optional(),
+      reporter_email: z.string().email().optional(),
+      template_id: z.string().uuid().optional(),
+      package_code: z.string().optional()
     })
   }),
 
@@ -92,10 +117,12 @@ export const schemas = {
   createComplaint: z.object({
     body: z.object({
       reporter_name: z.string().min(2).max(255),
-      reporter_photo_url: z.string().url().optional(),
+      reporter_email: z.string().email('Valid email is required'),
+      reporter_photo_url: z.string().url('Reporter photo must be a valid URL'),
       incident_photo_url: z.string().url().optional(),
       reported_person: z.string().optional(),
-      complaint_details: z.string().min(10)
+      complaint_details: z.string().min(10),
+      recaptcha_token: z.string().min(1, 'reCAPTCHA token is required')
     })
   }),
 

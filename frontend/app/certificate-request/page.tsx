@@ -4,8 +4,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { toast } from 'react-toastify';
+import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 
-export default function CertificateRequestPage() {
+function CertificateRequestForm() {
+  const { executeRecaptcha } = useGoogleReCaptcha();
   const [formData, setFormData] = useState({
     full_name: '',
     address: '',
@@ -15,16 +17,22 @@ export default function CertificateRequestPage() {
     civil_status: '',
     purpose: '',
     contact_number: '',
+    reporter_email: '',
     photo: null as File | null,
+    purok_cert: null as File | null,
+    sanitary_card: null as File | null,
   });
 
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: 'photo' | 'purok_cert' | 'sanitary_card'
+  ) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData({ ...formData, photo: e.target.files[0] });
+      setFormData({ ...formData, [field]: e.target.files[0] });
     }
   };
 
@@ -39,15 +47,42 @@ export default function CertificateRequestPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate required attachments
+    if (!formData.purok_cert) {
+      toast.error('Purok Certification is required');
+      return;
+    }
+    if (!formData.sanitary_card) {
+      toast.error('Sanitary Card is required');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      let photoUrl = '';
-      if (formData.photo) {
-        setUploading(true);
-        photoUrl = await uploadImage(formData.photo);
-        setUploading(false);
+      // Get reCAPTCHA token
+      if (!executeRecaptcha) {
+        throw new Error('reCAPTCHA not available');
       }
+
+      const recaptchaToken = await executeRecaptcha('submit_request');
+
+      // Upload all files
+      let photoUrl = '';
+      let purokCertUrl = '';
+      let sanitaryCardUrl = '';
+
+      setUploading(true);
+
+      if (formData.photo) {
+        photoUrl = await uploadImage(formData.photo);
+      }
+
+      purokCertUrl = await uploadImage(formData.purok_cert);
+      sanitaryCardUrl = await uploadImage(formData.sanitary_card);
+
+      setUploading(false);
 
       const res = await api.post('/certificates/request', {
         full_name: formData.full_name,
@@ -59,10 +94,14 @@ export default function CertificateRequestPage() {
         purpose: formData.purpose || undefined,
         contact_number: formData.contact_number || undefined,
         photo_url: photoUrl || undefined,
+        purok_cert_url: purokCertUrl,
+        sanitary_card_url: sanitaryCardUrl,
+        reporter_email: formData.reporter_email || undefined,
+        recaptcha_token: recaptchaToken,
       });
 
       setReferenceNumber(res.data.reference_number);
-      toast.success('Request submitted! Save your reference number.');
+      toast.success('Request submitted! Check your email for confirmation.');
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to submit request');
     } finally {
@@ -86,7 +125,7 @@ export default function CertificateRequestPage() {
             <div className="text-green-600 text-5xl mb-4">✓</div>
             <h1 className="text-2xl font-bold text-gray-900">Request Submitted</h1>
             <p className="text-gray-500 mt-2 mb-6">
-              Save your reference number to track your certificate.
+              A confirmation email has been sent. Save your reference number to track your document.
             </p>
 
             <div className="bg-gray-50 border rounded-xl p-4 mb-6">
@@ -96,7 +135,7 @@ export default function CertificateRequestPage() {
               </p>
             </div>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-3 justify-center flex-wrap">
               <button
                 onClick={copyReference}
                 className="px-5 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition shadow-sm"
@@ -105,10 +144,10 @@ export default function CertificateRequestPage() {
               </button>
 
               <Link
-                href="/certificate-status"
+                href="/track-document"
                 className="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition"
               >
-                Check Status
+                Track Document
               </Link>
 
               <Link
@@ -127,20 +166,17 @@ export default function CertificateRequestPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4">
       <div className="max-w-2xl mx-auto">
-
         <div className="bg-white shadow-xl border border-gray-100 rounded-2xl p-8 space-y-8">
-
           <div>
             <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-              Request Certificate
+              Request Document
             </h1>
             <p className="text-gray-500 text-sm mt-1">
-              Provide your details to request an official barangay certificate.
+              Provide your details and required attachments to request an official barangay document.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
-
             {/* PERSONAL INFO */}
             <div className="space-y-4">
               <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -202,12 +238,20 @@ export default function CertificateRequestPage() {
                   onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
                 />
               </div>
+
+              <input
+                type="email"
+                placeholder="Email (for notifications)"
+                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition"
+                value={formData.reporter_email}
+                onChange={(e) => setFormData({ ...formData, reporter_email: e.target.value })}
+              />
             </div>
 
-            {/* CERTIFICATE DETAILS */}
+            {/* DOCUMENT DETAILS */}
             <div className="space-y-4 pt-4 border-t">
               <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                Certificate Details
+                Document Details
               </h2>
 
               <select
@@ -216,7 +260,7 @@ export default function CertificateRequestPage() {
                 value={formData.certificate_type}
                 onChange={(e) => setFormData({ ...formData, certificate_type: e.target.value })}
               >
-                <option value="">Certificate Type</option>
+                <option value="">Document Type</option>
                 <option>Barangay Clearance</option>
                 <option>Certificate of Residency</option>
                 <option>Certificate of Indigency</option>
@@ -235,8 +279,55 @@ export default function CertificateRequestPage() {
                 type="file"
                 accept="image/*"
                 className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-100 file:text-primary-700 hover:file:bg-primary-200 transition"
-                onChange={handleFileChange}
+                onChange={(e) => handleFileChange(e, 'photo')}
               />
+              <p className="text-xs text-gray-500">Optional: Your photo for the document</p>
+            </div>
+
+            {/* REQUIRED ATTACHMENTS */}
+            <div className="space-y-4 pt-4 border-t">
+              <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                📄 Required Attachments
+              </h2>
+              <p className="text-xs text-gray-600">
+                The following documents are required for your request to be processed.
+              </p>
+
+              <div>
+                <div className="flex items-center mb-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Purok Certification <span className="text-red-500">*</span>
+                  </span>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  required
+                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 transition"
+                  onChange={(e) => handleFileChange(e, 'purok_cert')}
+                />
+                {formData.purok_cert && (
+                  <p className="text-xs text-green-600 mt-1">✓ File selected: {formData.purok_cert.name}</p>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center mb-2">
+                  <span className="text-sm font-medium text-gray-700">
+                    Sanitary Card <span className="text-red-500">*</span>
+                  </span>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  required
+                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 transition"
+                  onChange={(e) => handleFileChange(e, 'sanitary_card')}
+                />
+                {formData.sanitary_card && (
+                  <p className="text-xs text-green-600 mt-1">✓ File selected: {formData.sanitary_card.name}</p>
+                )}
+              </div>
             </div>
 
             {/* ACTIONS */}
@@ -244,9 +335,9 @@ export default function CertificateRequestPage() {
               <button
                 type="submit"
                 disabled={loading || uploading}
-                className="flex-1 bg-primary-600 text-white py-2.5 rounded-xl hover:bg-primary-700 transition shadow-sm"
+                className="flex-1 bg-primary-600 text-white py-2.5 rounded-xl hover:bg-primary-700 transition shadow-sm disabled:opacity-50"
               >
-                {uploading ? 'Uploading...' : loading ? 'Submitting...' : 'Submit Request'}
+                {uploading ? 'Uploading Files...' : loading ? 'Submitting...' : 'Submit Request'}
               </button>
 
               <Link
@@ -257,9 +348,42 @@ export default function CertificateRequestPage() {
               </Link>
             </div>
 
+            <p className="text-xs text-gray-500 text-center">
+              Protected by reCAPTCHA. This site is protected by reCAPTCHA and the Google{' '}
+              <a href="https://policies.google.com/privacy" className="underline">
+                Privacy Policy
+              </a>{' '}
+              and{' '}
+              <a href="https://policies.google.com/terms" className="underline">
+                Terms of Service
+              </a>{' '}
+              apply.
+            </p>
           </form>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CertificateRequestPage() {
+  const recaptchaKey = process.env.NEXT_PUBLIC_GOOGLE_RECAPTCHA_SITE_KEY;
+
+  if (!recaptchaKey) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-12 px-4">
+        <div className="max-w-2xl mx-auto bg-white rounded-2xl p-8">
+          <p className="text-red-600 text-center">
+            reCAPTCHA is not configured. Please contact the administrator.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <GoogleReCaptchaProvider reCaptchaKey={recaptchaKey}>
+      <CertificateRequestForm />
+    </GoogleReCaptchaProvider>
   );
 }
