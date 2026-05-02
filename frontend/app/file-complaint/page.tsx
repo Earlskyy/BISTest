@@ -60,6 +60,8 @@ function FileComplaintForm() {
   const openCamera = async () => {
     try {
       setVideoReady(false);
+      setCameraOpen(true); // Show modal immediately
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 1280, min: 640 },
@@ -73,23 +75,23 @@ function FileComplaintForm() {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Ensure video plays
-        const playPromise = videoRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              setVideoReady(true);
-            })
-            .catch((err) => {
-              console.error('Video play error:', err);
-              setVideoReady(true); // Allow capture anyway
-            });
-        }
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().then(() => {
+            setVideoReady(true);
+          }).catch((err) => {
+            console.error('Play error:', err);
+            setVideoReady(true);
+          });
+        };
       }
-      
-      setCameraOpen(true);
+
+      // Fallback: Set videoReady after 2 seconds if not already set
+      setTimeout(() => {
+        setVideoReady((prev) => prev ? prev : true);
+      }, 2000);
     } catch (error: any) {
       console.error('Camera error:', error);
+      setCameraOpen(false);
       toast.error('Camera access denied or unavailable: ' + error.message);
     }
   };
